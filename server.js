@@ -44,6 +44,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 let selectedSessionKey = null;
 let latestMetrics = {
   timestamp: Date.now(),
+  ok: true,
+  error: null,
   session: null,
   pricing: null,
   cost: 0,
@@ -63,7 +65,7 @@ function getPricing() {
 
 async function gatewayInvoke(tool, args) {
   if (!GATEWAY_TOKEN) {
-    throw new Error('Missing OPENCLAW_GATEWAY_TOKEN (refusing to call gateway).');
+    throw new Error('Missing OPENCLAW_GATEWAY_TOKEN (set it in your environment or .env).');
   }
 
   const response = await fetch(`${GATEWAY_HTTP_URL}/tools/invoke`, {
@@ -106,6 +108,8 @@ async function fetchMetrics() {
 
     latestMetrics = {
       timestamp: Date.now(),
+      ok: true,
+      error: null,
       session: {
         id: session.sessionId,
         key: session.key,
@@ -120,14 +124,30 @@ async function fetchMetrics() {
       sessions: sessions.map((s) => ({ key: s.key, label: s.displayName || s.key }))
     };
   } catch (err) {
+    const msg = String(err?.message ?? err);
     // Keep server alive; metrics will show last known values.
-    console.error('Error fetching metrics:', err.message);
+    latestMetrics = {
+      ...latestMetrics,
+      timestamp: Date.now(),
+      ok: false,
+      error: msg
+    };
+    console.error('Error fetching metrics:', msg);
   }
 }
 
 // Poll every 15 seconds
 setInterval(fetchMetrics, 15000);
 fetchMetrics();
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    now: Date.now(),
+    gatewayConfigured: Boolean(GATEWAY_TOKEN),
+    gatewayUrl: GATEWAY_HTTP_URL
+  });
+});
 
 app.get('/api/metrics', (req, res) => {
   res.json(latestMetrics);

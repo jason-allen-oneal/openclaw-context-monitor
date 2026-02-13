@@ -143,7 +143,7 @@
 </head>
 <body>
     <header>
-        <div><span class="status-dot blink"></span> CONTEXT-DRIFT // v1.0.0</div>
+        <div><span class="status-dot blink"></span> CONTEXT-DRIFT // v0.1.0</div>
         <div>
             <select id="session-selector" onchange="selectSession(this.value)">
                 <option>LOADING SESSIONS...</option>
@@ -151,6 +151,11 @@
         </div>
         <div id="refresh-timer">LAST UPDATED: <span id="last-update">--:--:--</span></div>
     </header>
+
+    <div id="error" class="panel" style="display:none; margin-bottom: 20px; border-color: rgba(255, 77, 77, 0.4)">
+        <h2 style="color:#ff4d4d">ERROR</h2>
+        <div class="details" style="color:#ffb3b3" id="error-text"></div>
+    </div>
 
     <div class="grid">
         <div class="panel">
@@ -210,6 +215,15 @@
                 const res = await fetch('/api/metrics');
                 const data = await res.json();
                 
+                const errBox = document.getElementById('error');
+                const errText = document.getElementById('error-text');
+                if (data.ok === false) {
+                    errText.textContent = data.error || 'Unknown error';
+                    errBox.style.display = 'block';
+                } else {
+                    errBox.style.display = 'none';
+                }
+
                 if (!data.session) return;
 
                 // Update Selector

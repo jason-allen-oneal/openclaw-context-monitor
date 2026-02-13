@@ -26,7 +26,7 @@ function hardenHeaders(req, res, next) {
   res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader(
     'content-security-policy',
-    "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self';"
+    "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self';"
   );
   next();
 }

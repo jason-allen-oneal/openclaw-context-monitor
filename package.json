@@ -1,0 +1,22 @@
+{
+  "name": "context-drift",
+  "version": "0.1.0",
+  "description": "Standalone OpenClaw context pressure + cost monitor (sidecar dashboard)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "openclaw",
+    "observability",
+    "tokens",
+    "cost",
+    "dashboard"
+  ],
+  "author": "Jason",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  }
+}

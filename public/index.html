@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CONTEXT-DRIFT // MONITOR</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --panel: #111;
+            --accent: #00ff41; /* Matrix/Hacker Green */
+            --accent-dim: #003b0f;
+            --text: #c9ffe0;
+            --muted: #55c985;
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-mono);
+            margin: 0;
+            padding: 20px;
+            text-transform: uppercase;
+        }
+
+        header {
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--accent);
+            margin-right: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: var(--panel);
+            border: 1px solid var(--accent-dim);
+            padding: 20px;
+            position: relative;
+        }
+
+        .panel::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, var(--accent), transparent);
+        }
+
+        .panel h2 {
+            margin-top: 0;
+            font-size: 0.9rem;
+            color: var(--muted);
+            border-bottom: 1px solid var(--accent-dim);
+            padding-bottom: 5px;
+        }
+
+        .stat-large {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+            color: var(--accent);
+        }
+
+        .gauge-container {
+            width: 100%;
+            height: 20px;
+            background-color: var(--accent-dim);
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            background-color: var(--accent);
+            width: 0%;
+            transition: width 0.5s ease;
+            box-shadow: 0 0 15px var(--accent);
+        }
+
+        .details {
+            font-size: 0.8rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .details span {
+            color: var(--text);
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 0.7rem;
+            color: var(--accent-dim);
+            text-align: center;
+        }
+
+        #refresh-timer {
+            font-size: 0.7rem;
+        }
+
+        #session-selector {
+            background: var(--bg);
+            color: var(--accent);
+            border: 1px solid var(--accent-dim);
+            font-family: var(--font-mono);
+            padding: 5px;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        #session-selector:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        @keyframes blink {
+            50% { opacity: 0.3; }
+        }
+
+        .blink {
+            animation: blink 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div><span class="status-dot blink"></span> CONTEXT-DRIFT // v1.0.0</div>
+        <div>
+            <select id="session-selector" onchange="selectSession(this.value)">
+                <option>LOADING SESSIONS...</option>
+            </select>
+        </div>
+        <div id="refresh-timer">LAST UPDATED: <span id="last-update">--:--:--</span></div>
+    </header>
+
+    <div class="grid">
+        <div class="panel">
+            <h2>CONTEXT PRESSURE</h2>
+            <div id="pressure-val" class="stat-large">0.0%</div>
+            <div class="gauge-container">
+                <div id="pressure-gauge" class="gauge-fill"></div>
+            </div>
+            <div class="details">
+                LIMIT: <span id="context-limit">0</span> TOKENS<br>
+                CURRENT: <span id="total-tokens">0</span> TOKENS
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>SESSION BURN RATE</h2>
+            <div id="cost-val" class="stat-large">$0.0000</div>
+            <div class="details">
+                MODEL: <span id="model-name">--</span><br>
+                ESTIMATED USD (CURRENT SESSION)
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>ACTIVE SESSION</h2>
+            <div id="session-key" class="stat-large" style="font-size: 1.2rem; margin: 20px 0;">--</div>
+            <div class="details">
+                ID: <span id="session-id">--</span><br>
+                MODIFIED: <span id="updated-at">--</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        [ SYSTEM_MONITOR_ACTIVE ]
+    </div>
+
+    <script>
+        let currentSessionKey = null;
+
+        async function selectSession(key) {
+            if (key === currentSessionKey) return;
+            try {
+                await fetch('/api/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key })
+                });
+                update();
+            } catch (err) {
+                console.error('Selection failed:', err);
+            }
+        }
+
+        async function update() {
+            try {
+                const res = await fetch('/api/metrics');
+                const data = await res.json();
+                
+                if (!data.session) return;
+
+                // Update Selector
+                const selector = document.getElementById('session-selector');
+                const sessions = data.sessions || [];
+                
+                // Keep selection in sync
+                currentSessionKey = data.session.key;
+
+                // Only rebuild options if they changed or we are initializing
+                const currentKeys = Array.from(selector.options).map(o => o.value).join(',');
+                const newKeys = sessions.map(s => s.key).join(',');
+
+                if (currentKeys !== newKeys) {
+                    selector.innerHTML = '';
+                    sessions.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.key;
+                        opt.textContent = (s.label || s.key).substring(0, 30);
+                        if (s.key === currentSessionKey) opt.selected = true;
+                        selector.appendChild(opt);
+                    });
+                } else if (selector.value !== currentSessionKey) {
+                    selector.value = currentSessionKey;
+                }
+
+                document.getElementById('pressure-val').textContent = data.pressure + '%';
+                document.getElementById('pressure-gauge').style.width = data.pressure + '%';
+                document.getElementById('context-limit').textContent = data.session.contextTokens.toLocaleString();
+                document.getElementById('total-tokens').textContent = data.session.totalTokens.toLocaleString();
+
+                document.getElementById('cost-val').textContent = '$' + data.cost.toFixed(4);
+                document.getElementById('model-name').textContent = data.session.model;
+
+                document.getElementById('session-key').textContent = data.session.key;
+                document.getElementById('session-id').textContent = data.session.id.substring(0, 8) + '...';
+                document.getElementById('updated-at').textContent = new Date(data.session.updatedAt).toLocaleTimeString();
+
+                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+            } catch (err) {
+                console.error('Update failed:', err);
+            }
+        }
+
+        setInterval(update, 5000);
+        update();
+    </script>
+</body>
+</html>
